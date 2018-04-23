@@ -6404,7 +6404,7 @@
         "_monoTracker": ""
       },
       "icon": "Mono.net.png",
-      "implies": "Piwik",
+      "implies": "Matomo",
       "script": "monotracker(?:\\.min)?\\.js",
       "website": "https://www.mono.net/en"
     },
@@ -7553,12 +7553,12 @@
       "implies": "Java",
       "website": "https://www.pirobase-imperia.com/de/produkte/produktuebersicht/pirobase-cms"
     },
-    "Piwik": {
+    "Matomo": {
       "cats": [
         10
       ],
       "js": {
-        "Piwik": "",
+        "Matomo": "",
         "_paq": ""
       },
       "cookies": {
@@ -7567,7 +7567,7 @@
       "icon": "Piwik.png",
       "meta": {
         "apple-itunes-app": "app-id=737216887",
-        "generator": "Piwik - Open Source Web Analytics",
+        "generator": "Matomo - Open Source Web Analytics",
         "google-play-app": "app-id=org\\.piwik\\.mobile2"
       },
       "script": "piwik\\.js|piwik\\.php",
