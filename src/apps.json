@@ -6404,7 +6404,7 @@
         "_monoTracker": ""
       },
       "icon": "Mono.net.png",
-      "implies": "Piwik",
+      "implies": "Matomo",
       "script": "monotracker(?:\\.min)?\\.js",
       "website": "https://www.mono.net/en"
     },
@@ -7553,7 +7553,7 @@
       "implies": "Java",
       "website": "https://www.pirobase-imperia.com/de/produkte/produktuebersicht/pirobase-cms"
     },
-    "Piwik": {
+    "Matomo": {
       "cats": [
         10
       ],
