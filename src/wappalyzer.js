@@ -88,15 +88,13 @@ class Wappalyzer {
       if ( data.headers ) {
         promises.push(this.analyzeHeaders(app, data.headers));
       }
-
-      if ( data.env ) {
-        promises.push(this.analyzeEnv(app, data.env));
-      }
     });
 
     if ( data.js ) {
       Object.keys(data.js).forEach(appName => {
-        promises.push(this.analyzeJs(apps[appName], data.js[appName]));
+        if (typeof data.js[appName] != 'function') {
+          promises.push(this.analyzeJs(apps[appName], data.js[appName]));
+        }
       });
     }
 
@@ -125,7 +123,7 @@ class Wappalyzer {
 
           this.driver.displayApps(this.detected[url.canonical], { language }, context);
 
-          resolve();
+          return resolve();
         });
     });
   }
@@ -202,10 +200,15 @@ class Wappalyzer {
    *
    */
   ping() {
-    if ( Object.keys(this.hostnameCache).length + this.adCache.length > 50 ) {
-      this.driver.ping(this.hostnameCache, this.adCache);
+    if ( Object.keys(this.hostnameCache).length > 100 ) {
+      this.driver.ping(this.hostnameCache);
 
       this.hostnameCache = {};
+    }
+
+    if ( this.adCache.length > 50 ) {
+      this.driver.ping({}, this.adCache);
+
       this.adCache = [];
     }
   }
@@ -300,7 +303,7 @@ class Wappalyzer {
 
     // Remove excluded applications
     Object.keys(apps).forEach(appName => {
-      if ( excludes.indexOf(appName) !== -1 ) {
+      if ( excludes.indexOf(appName) > -1 ) {
         delete apps[appName];
       }
     })
@@ -335,7 +338,7 @@ class Wappalyzer {
 
             // Apply app confidence to implied app
             Object.keys(app.confidence).forEach(id => {
-              apps[implied.string].confidence[id + ' implied by ' + appName] = app.confidence[id] * ( implied.confidence ? implied.confidence / 100 : 1 );
+              apps[implied.string].confidence[id + ' implied by ' + appName] = app.confidence[id] * ( implied.confidence === undefined ? 1 : implied.confidence / 100 );
             });
           });
         }
@@ -452,8 +455,6 @@ class Wappalyzer {
     }
 
     return this.asyncForEach(patterns, pattern => {
-      var match;
-
       scripts.forEach(uri => {
         if ( pattern.regex.test(uri) ) {
           this.addDetected(app, pattern, 'script', uri);
@@ -470,15 +471,14 @@ class Wappalyzer {
     const patterns = this.parsePatterns(app.props.meta);
     const promises = [];
 
-    var content = '';
-    var matches = [];
+    let matches;
 
     while ( patterns && ( matches = regex.exec(html) ) ) {
-      for ( var meta in patterns ) {
+      for ( let meta in patterns ) {
         const r = new RegExp('(?:name|property)=["\']' + meta + '["\']', 'i');
 
         if ( r.test(matches[0]) ) {
-          content = matches[0].match(/content=("|')([^"']+)("|')/i);
+          let content = matches[0].match(/content=("|')([^"']+)("|')/i);
 
           promises.push(this.asyncForEach(patterns[meta], pattern => {
             if ( content && content.length === 4 && pattern.regex.test(content[2]) ) {
@@ -500,17 +500,19 @@ class Wappalyzer {
     const promises = [];
 
     Object.keys(patterns).forEach(headerName => {
-      promises.push(this.asyncForEach(patterns[headerName], pattern => {
-        headerName = headerName.toLowerCase();
+      if (typeof patterns[headerName] != 'function') {
+        promises.push(this.asyncForEach(patterns[headerName], pattern => {
+          headerName = headerName.toLowerCase();
 
-        if ( headerName in headers ) {
-          headers[headerName].forEach(headerValue => {
-            if ( pattern.regex.test(headerValue) ) {
-              this.addDetected(app, pattern, 'headers', headerValue, headerName);
-            }
-          });
-        }
-      }));
+          if ( headerName in headers ) {
+            headers[headerName].forEach(headerValue => {
+              if ( pattern.regex.test(headerValue) ) {
+                this.addDetected(app, pattern, 'headers', headerValue, headerName);
+              }
+            });
+          }
+        }));
+      }
     });
 
     return promises ? Promise.all(promises) : Promise.resolve();
@@ -524,37 +526,20 @@ class Wappalyzer {
     const promises = [];
 
     Object.keys(patterns).forEach(cookieName => {
-      cookieName = cookieName.toLowerCase();
+      if (typeof patterns[cookieName] != 'function') {
+        cookieName = cookieName.toLowerCase();
 
-      promises.push(this.asyncForEach(patterns[cookieName], pattern => {
-        const cookie = cookies.find(cookie => cookie.name.toLowerCase() === cookieName);
+        promises.push(this.asyncForEach(patterns[cookieName], pattern => {
+          const cookie = cookies.find(cookie => cookie.name.toLowerCase() === cookieName);
 
-        if ( cookie && pattern.regex.test(cookie.value) ) {
-          this.addDetected(app, pattern, 'cookies', cookie.value, cookieName);
-        }
-      }));
+          if ( cookie && pattern.regex.test(cookie.value) ) {
+            this.addDetected(app, pattern, 'cookies', cookie.value, cookieName);
+          }
+        }));
+      }
     });
 
     return promises ? Promise.all(promises) : Promise.resolve();
-  }
-
-  /**
-   * Analyze environment variables
-   */
-  analyzeEnv(app, envs) {
-    var patterns = this.parsePatterns(app.props.env);
-
-    if ( patterns.length ) {
-      return Promise.resolve();
-    }
-
-    return this.asyncForEach(patterns, pattern => {
-      Object.keys(envs).forEach(env => {
-        if ( pattern.regex.test(envs[env]) ) {
-          this.addDetected(app, pattern, 'env', envs[env]);
-        }
-      })
-    });
   }
 
   /**
@@ -564,14 +549,16 @@ class Wappalyzer {
     const promises = [];
 
     Object.keys(results).forEach(string => {
-      promises.push(this.asyncForEach(Object.keys(results[string]), index => {
-        const pattern = this.jsPatterns[app.name][string][index];
-        const value = results[string][index];
+      if (typeof results[string] != 'function') {
+        promises.push(this.asyncForEach(Object.keys(results[string]), index => {
+          const pattern = this.jsPatterns[app.name][string][index];
+          const value = results[string][index];
 
-        if ( pattern && pattern.regex.test(value) ) {
-          this.addDetected(app, pattern, 'js', value);
-        }
-      }));
+          if ( pattern && pattern.regex.test(value) ) {
+            this.addDetected(app, pattern, 'js', value);
+          }
+        }));
+      }
     });
 
     return promises ? Promise.all(promises) : Promise.resolve();
@@ -584,7 +571,7 @@ class Wappalyzer {
     app.detected = true;
 
     // Set confidence level
-    app.confidence[type + ' ' + ( key ? key + ' ' : '' ) + pattern.regex] = pattern.confidence || 100;
+    app.confidence[type + ' ' + ( key ? key + ' ' : '' ) + pattern.regex] = pattern.confidence === undefined ? 100 : parseInt(pattern.confidence);
 
     // Detect version number
     if ( pattern.version ) {
@@ -638,7 +625,7 @@ class Application {
   getConfidence() {
     var total = 0;
 
-    for ( var id in this.confidence ) {
+    for ( let id in this.confidence ) {
       total += this.confidence[id];
     }
 

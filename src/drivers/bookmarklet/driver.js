@@ -9,7 +9,7 @@
   wappalyzer.driver.document = document;
 
 	const container = document.getElementById('wappalyzer-container');
-	const url = wappalyzer.parseUrl(top.location.href);
+	const url = wappalyzer.parseUrl(window.top.location.href);
 	const hasOwn = Object.prototype.hasOwnProperty;
 
   /**
@@ -22,20 +22,20 @@
   function getPageContent() {
     wappalyzer.log('func: getPageContent', 'driver');
 
-    var env = [];
-
-    for ( let i in window ) {
-      env.push(i);
-    }
-
     var scripts = Array.prototype.slice
       .apply(document.scripts)
       .filter(s => s.src)
       .map(s => s.src);
 
+    var html = new window.XMLSerializer().serializeToString(document).split('\n');
+
+    html = html
+      .slice(0, 1000).concat(html.slice(html.length - 1000))
+      .map(line => line.substring(0, 1000))
+      .join('\n');
+
     wappalyzer.analyze(url, {
-      html: document.documentElement.innerHTML,
-      env: env,
+      html: html,
       scripts: scripts
     });
   }
